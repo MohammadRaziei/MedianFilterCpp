@@ -1,5 +1,5 @@
 #include <iostream>
-#include <string>
+#include <stdint.h>
 #include <vector>
 #include <algorithm>
 #include <chrono>
@@ -9,8 +9,8 @@
 
 #define UINT unsigned int
 #define MaxMedianWindow (300)
+#define NUM_THREADS (128)
 typedef std::chrono::high_resolution_clock chronoTime;
-#define chronoMicrosecond(x) std::chrono::duration_cast<std::chrono::microseconds>(x).count()
 
 enum class ParallelMethod
 {
@@ -24,19 +24,17 @@ inline void movingAverageFilterKernel(float output[], const float input[], const
     const UINT windowSize = 2 * halfWindow + 1;
     float sum = 0;
     for (UINT i = 0; i < windowSize; ++i) sum += input[i];
-
     output[0] = sum / windowSize;
-    for (UINT i = 1; i < len; ++i)
+    for (UINT i = 0; i < len - 1; ++i)
     {
-        sum += (input[i + windowSize] - input[i - 1]);
-        output[i] = sum / windowSize;
+        sum += (input[i + windowSize] - input[i]);
+        output[i + 1] = sum / windowSize;
     }
 }
 
 inline void sortedInOut(float sortedData[], const UINT len, const float& outValue, const float& inValue)
 {
     bool notFound = true;
-    signed char allTasks = 2;
     float value = sortedData[0], saveValue;
     sortedData[len] = inValue;
     for (UINT j = 0, i = 0; i < len; ++i)
@@ -44,13 +42,11 @@ inline void sortedInOut(float sortedData[], const UINT len, const float& outValu
         if (value == outValue)
         {
             value = sortedData[++j];
-            --allTasks;
         }
         if (notFound && value >= inValue)
         {
             sortedData[i] = inValue;
             notFound = false;
-            --allTasks;
         }
         else
         {
@@ -58,22 +54,20 @@ inline void sortedInOut(float sortedData[], const UINT len, const float& outValu
             value = sortedData[++j];
             sortedData[i] = saveValue;
         }
-        if (allTasks <= 0) break;
     }
 }
 inline void medianFilterKernel(float output[], const float input[], const UINT len, const UINT halfWindow)
 {
-    const UINT halfWindow1 = halfWindow + 1;
     const UINT windowSize = 2 * halfWindow + 1;
     float* temp = new float[windowSize + 1];
     //    float temp[MaxMedianWindow];
     memcpy(temp, input, windowSize * sizeof(float));
     std::sort(temp, temp + windowSize);
-    output[0] = temp[halfWindow1];
-    for (UINT i = 1; i < len; ++i)
+    output[0] = temp[halfWindow];
+    for (UINT i = 0; i < len - 1; ++i)
     {
-        sortedInOut(temp, windowSize, input[i - 1], input[i + windowSize]);
-        output[i] = temp[halfWindow1];
+        sortedInOut(temp, windowSize, input[i], input[i + windowSize]);
+        output[i + 1] = temp[halfWindow];
     }
     delete[] temp;
 }
@@ -100,9 +94,13 @@ void movingFilter(std::vector<float>& output,
         }
         case ParallelMethod::CPU:
         {
-            const UINT lenFrames = (UINT)(vecSize / 100);
+            const UINT lenFrames = (UINT)(vecSize / NUM_THREADS);
+            const UINT lenFramesDouble = lenFrames * 2;
             Concurrency::parallel_for((UINT)0, (UINT)vecSize, lenFrames, [&](const UINT& i) {
-                filtKernel(output.data() + i, inp.data() + i, lenFrames, halfWindow);
+                if (i + lenFramesDouble < vecSize)
+                    filtKernel(output.data() + i, inp.data() + i, lenFrames, halfWindow);
+                else
+                    filtKernel(output.data() + i, inp.data() + i, (UINT)vecSize - i, halfWindow);
             });
             break;
         }
@@ -123,7 +121,7 @@ inline float myrand()
 int main()
 {
     std::vector<float> data(500000);
-    std::generate(data.begin(), data.end(), []() { return myrand() < 0.001 ? 100 * myrand() : myrand(); });
+    std::generate(data.begin(), data.end(), []() { return myrand() < 0.0001 ? 100 * myrand() : myrand(); });
     std::vector<float> filtData(data.size());
     const UINT halfWindowSize = 75;
 
