@@ -117,7 +117,7 @@ inline float myrand()
 int main()
 {
     std::vector<float> data(500000);
-    std::generate(data.begin(), data.end(), []() { return myrand() < 0.01 ? 1 + myrand() : myrand(); });
+    std::generate(data.begin(), data.end(), []() { return myrand() < 0.001 ? 100 * myrand() : myrand(); });
     std::vector<float> filtData(data.size());
     const UINT halfWindowSize = 75;
 
