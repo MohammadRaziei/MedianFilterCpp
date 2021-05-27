@@ -36,7 +36,7 @@ inline void movingAverageFilterKernel(float output[], const float input[], const
 inline void sortedInOut(float sortedData[], const UINT len, const float& outValue, const float& inValue)
 {
     bool notFound = true;
-    char allTasks = 2;
+    signed char allTasks = 2;
     float value = sortedData[0], saveValue;
     sortedData[len] = inValue;
     for (UINT j = 0, i = 0; i < len; ++i)
