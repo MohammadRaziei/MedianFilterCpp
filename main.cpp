@@ -1,4 +1,3 @@
-// Example program
 #include <iostream>
 #include <string>
 #include <vector>
@@ -19,6 +18,20 @@ enum class ParallelMethod
     CPU,
     GPU
 };
+
+inline void movingAverageFilterKernel(float output[], const float input[], const UINT len, const UINT halfWindow)
+{
+    const UINT windowSize = 2 * halfWindow + 1;
+    float sum = 0;
+    for (UINT i = 0; i < windowSize; ++i) sum += input[i] / windowSize;
+
+    output[0] = sum;
+    for (UINT i = 1; i < len; ++i)
+    {
+        sum += (input[i + windowSize] - input[i - 1]) / windowSize;
+        output[i] = sum;
+    }
+}
 
 inline void sortedInOut(float sortedData[], const UINT len, const float& outValue, const float& inValue)
 {
@@ -58,7 +71,12 @@ inline void medianFilterKernel(float output[], const float input[], const UINT l
     }
     delete[] temp;
 }
-void medianFilter(std::vector<float>& output, const std::vector<float>& input, const UINT halfWindow, const ParallelMethod& method = ParallelMethod::NONE)
+
+void movingFilter(std::vector<float>& output,
+     const std::vector<float>& input,
+     const UINT halfWindow,
+     const std::function<void(float[], const float[], const UINT, const UINT)>& filtKernel,
+     const ParallelMethod& method = ParallelMethod::NONE)
 {
     const size_t vecSize = input.size();
     const UINT windowSize = 2 * halfWindow + 1;
@@ -71,14 +89,14 @@ void medianFilter(std::vector<float>& output, const std::vector<float>& input, c
     {
         case ParallelMethod::NONE:
         {
-            medianFilterKernel(output.data(), inp.data(), (UINT)vecSize, halfWindow);
+            filtKernel(output.data(), inp.data(), (UINT)vecSize, halfWindow);
             break;
         }
         case ParallelMethod::CPU:
         {
             const UINT lenFrames = (UINT)(vecSize / 100);
             Concurrency::parallel_for((UINT)0, (UINT)vecSize, lenFrames, [&](const UINT& i) {
-                medianFilterKernel(output.data() + i, inp.data() + i, lenFrames, halfWindow);
+                filtKernel(output.data() + i, inp.data() + i, lenFrames, halfWindow);
             });
             break;
         }
@@ -88,7 +106,7 @@ void medianFilter(std::vector<float>& output, const std::vector<float>& input, c
         }
     }
     stop = chronoTime::now();
-    std::cout << "Elapsed Time: " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() / 1e3 << " ms" << std::endl;
+    std::cout << "\tElapsed Time: " << std::chrono::duration_cast<std::chrono::microseconds>(stop - start).count() / 1e3 << " ms" << std::endl;
 }
 
 inline float myrand()
@@ -101,15 +119,27 @@ int main()
     std::vector<float> data(500000);
     std::generate(data.begin(), data.end(), []() { return myrand() < 0.01 ? 1 + myrand() : myrand(); });
     std::vector<float> filtData(data.size());
+    const UINT halfWindowSize = 75;
 
     io::writeToFile("input.bin", data);
 
+    std::cout << "* Moving-Average Filter:" << std::endl;
     std::cout << ">> ParallelMethod::NONE" << std::endl;
-    medianFilter(filtData, data, 75, ParallelMethod::NONE);
-    io::writeToFile("output-NONE.bin", filtData);
+    movingFilter(filtData, data, halfWindowSize, movingAverageFilterKernel, ParallelMethod::NONE);
+    io::writeToFile("output-meanNONE.bin", filtData);
     std::cout << ">> ParallelMethod::CPU" << std::endl;
-    medianFilter(filtData, data, 75, ParallelMethod::CPU);
-    io::writeToFile("output-CPU.bin", filtData);
+    movingFilter(filtData, data, halfWindowSize, movingAverageFilterKernel, ParallelMethod::CPU);
+    io::writeToFile("output-meanCPU.bin", filtData);
+
+    std::cout << std::endl;
+
+    std::cout << "* Median Filter:" << std::endl;
+    std::cout << ">> ParallelMethod::NONE" << std::endl;
+    movingFilter(filtData, data, halfWindowSize, medianFilterKernel, ParallelMethod::NONE);
+    io::writeToFile("output-medianNONE.bin", filtData);
+    std::cout << ">> ParallelMethod::CPU" << std::endl;
+    movingFilter(filtData, data, halfWindowSize, medianFilterKernel, ParallelMethod::CPU);
+    io::writeToFile("output-medianCPU.bin", filtData);
 
     //    float sortedData[6] = {1, 2, 3, 4, 5};
     //    const UINT len = sizeof(sortedData) / sizeof(float) - 1;

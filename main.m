@@ -4,18 +4,38 @@ clc;clear;close all
 fileID=fopen('input.bin','r');
 input=fread(fileID,'float32');
 fclose(fileID); clear("fileID");
-fileID=fopen('output-NONE.bin','r');
-outputNONE=fread(fileID,'float32');
-fclose(fileID); clear("fileID");
-fileID=fopen('output-CPU.bin','r');
-outputCPU=fread(fileID,'float32');
+
+fileID=fopen('output-meanNONE.bin','r');
+output_meanNONE=fread(fileID,'float32');
 fclose(fileID); clear("fileID");
 
-[m, idx] = max(abs(outputCPU - outputNONE));
+fileID=fopen('output-meanCPU.bin','r');
+output_meanCPU=fread(fileID,'float32');
+fclose(fileID); clear("fileID");
+
+fileID=fopen('output-medianNONE.bin','r');
+output_medianNONE=fread(fileID,'float32');
+fclose(fileID); clear("fileID");
+
+fileID=fopen('output-medianCPU.bin','r');
+output_medianCPU=fread(fileID,'float32');
+fclose(fileID); clear("fileID");
 
 ind = 1:500000;
+
+
+[m, idx] = max(abs(output_meanCPU - output_meanNONE));
 figure; hold on
+title('Moving-Average Filter')
 plot(ind, input(ind), 'Color',0.5*[1,1,1]);
-plot(ind, outputNONE(ind), '-');
-plot(ind, outputCPU(ind), '-.');
-if(m > 0.001), plot(275084, outputCPU(275084), 'r*'); end
+plot(ind, output_meanNONE(ind), '-');
+plot(ind, output_meanCPU(ind), '-.');
+if(m > 0.001), plot(idx, output_meanCPU(idx), 'r*'); end
+
+[m, idx] = max(abs(output_medianCPU - output_medianNONE));
+figure; hold on
+title('medianFilter')
+plot(ind, input(ind), 'Color',0.5*[1,1,1]);
+plot(ind, output_medianNONE(ind), '-');
+plot(ind, output_medianCPU(ind), '-.');
+if(m > 0.001), plot(idx, output_medianCPU(idx), 'r*'); end
