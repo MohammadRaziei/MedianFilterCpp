@@ -23,29 +23,34 @@ inline void movingAverageFilterKernel(float output[], const float input[], const
 {
     const UINT windowSize = 2 * halfWindow + 1;
     float sum = 0;
-    for (UINT i = 0; i < windowSize; ++i) sum += input[i] / windowSize;
+    for (UINT i = 0; i < windowSize; ++i) sum += input[i];
 
-    output[0] = sum;
+    output[0] = sum / windowSize;
     for (UINT i = 1; i < len; ++i)
     {
-        sum += (input[i + windowSize] - input[i - 1]) / windowSize;
-        output[i] = sum;
+        sum += (input[i + windowSize] - input[i - 1]);
+        output[i] = sum / windowSize;
     }
 }
 
 inline void sortedInOut(float sortedData[], const UINT len, const float& outValue, const float& inValue)
 {
     bool notFound = true;
+    char allTasks = 2;
     float value = sortedData[0], saveValue;
     sortedData[len] = inValue;
     for (UINT j = 0, i = 0; i < len; ++i)
     {
         if (value == outValue)
+        {
             value = sortedData[++j];
+            --allTasks;
+        }
         if (notFound && value >= inValue)
         {
             sortedData[i] = inValue;
             notFound = false;
+            --allTasks;
         }
         else
         {
@@ -53,6 +58,7 @@ inline void sortedInOut(float sortedData[], const UINT len, const float& outValu
             value = sortedData[++j];
             sortedData[i] = saveValue;
         }
+        if (allTasks <= 0) break;
     }
 }
 inline void medianFilterKernel(float output[], const float input[], const UINT len, const UINT halfWindow)
