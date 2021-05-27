@@ -30,12 +30,21 @@ title('Moving-Average Filter')
 plot(ind, input(ind), 'Color',0.5*[1,1,1]);
 plot(ind, output_meanNONE(ind), '-');
 plot(ind, output_meanCPU(ind), '-.');
-if(m > 0.001), plot(idx, output_meanCPU(idx), 'r*'); end
+if(m > 0.001) plot(idx, output_meanCPU(idx), 'r*'); end
+legend('Input', 'NONE', 'CPU');
 
 [m, idx] = max(abs(output_medianCPU - output_medianNONE));
 figure; hold on
-title('medianFilter')
+title('Median Filter')
 plot(ind, input(ind), 'Color',0.5*[1,1,1]);
 plot(ind, output_medianNONE(ind), '-');
 plot(ind, output_medianCPU(ind), '-.');
 if(m > 0.001), plot(idx, output_medianCPU(idx), 'r*'); end
+legend('Input', 'NONE', 'CPU');
+
+figure; hold on
+title('Compare Filters')
+plot(ind, input(ind), 'Color',0.5*[1,1,1]);
+plot(ind, output_medianNONE(ind), '-');
+plot(ind, output_meanNONE(ind), '-.');
+legend('Input', 'Median', 'Moving-Average');
