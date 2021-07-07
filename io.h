@@ -1,4 +1,7 @@
 #pragma once
+#define NOMINMAX
+#define no_init_all deprecated
+#include <Windows.h>
 #include <stdint.h>
 #include <algorithm>
 #include <complex>
@@ -8,6 +11,7 @@
 #include <iterator>
 #include <string>
 #include <vector>
+#include <sstream>
 
 #define compT std::complex<T>
 #define compFloat std::complex<float>
@@ -65,27 +69,35 @@ void print(T a, ARG... arg) noexcept
 template <typename T>
 void print(const vectT& a) noexcept
 {
+    if (a.empty()) return;
     std::cout << vectT(a.begin(),
                       a.begin() +
                            std::min<size_t>(a.size(), Max_Print_Vector_Size))
               << std::endl;
 }
+template <typename T>
+void printArray(T* a, uint32_t len) noexcept
+{
+    for (uint32_t i = 0; i < len; ++i)
+        std::cout << a[i] << ", ";
+    std::cout << std::endl;
+}
 
 namespace io
 {
 template <typename T>
-void readFromFile(const std::string filename,
-     std::vector<T>& vec,
+std::vector<T> readFromFile(const std::string filename,
      size_t length = (size_t)(-1),
      size_t* start = nullptr) noexcept
 {
+    std::vector<T> buf;
     // open the file:
     std::ifstream infile(filename, std::ios::binary);
     if (!infile.is_open())
     {
         fprintf(stderr, "Cannot open: \"%s\"\n", filename.c_str());
         infile.close();
-        return;
+        return buf;
     }
     // Stop eating new lines in binary mode!!!
     infile.unsetf(std::ios::skipws);
@@ -98,7 +110,7 @@ void readFromFile(const std::string filename,
     {
         fprintf(stderr, "startByte > fileSizeByte\n");
         infile.close();
-        return;
+        return buf;
     }
     infile.seekg(startByte, std::ios::beg);
     fileSizeByte -= startByte;
@@ -107,17 +119,10 @@ void readFromFile(const std::string filename,
     fileSize = std::min<size_t>(fileSize, length);
     if (start) *start += fileSize;
 
-    vec.resize(fileSize);
-    infile.read(reinterpret_cast<char*>(vec.data()), vec.size() * sizeof(T));
+    buf.resize(fileSize);
+    infile.read(reinterpret_cast<char*>(buf.data()), buf.size() * sizeof(T));
     infile.close();
-}
-template <typename T = float>
-std::vector<T> readFromFile(const std::string filename,
-     size_t length = (size_t)(-1),
-     size_t* start = nullptr) noexcept
-{
-    std::vector<T> buf;
-    readFromFile(filename, buf, length, start);
+
     return buf;
 }
 
@@ -182,6 +187,20 @@ std::string readTextFile(const std::string& filename) noexcept
     return src;
 }
 
+inline void writeTextFile(const std::string& filename, const std::string& text)
+{
+    std::ofstream ofs(filename, std::ios::out | std::ofstream::binary);
+    ofs.write(text.c_str(), text.size());
+    ofs.close();
+}
+template <typename T>
+inline void writeTextFile(const std::string& filename, const T& val)
+{
+    std::stringstream stream;
+    stream << std::boolalpha << val;
+    writeTextFile(filename, stream.str());
+}
+
 template <typename T>
 void writeToFile(const std::string& filename, const vectT& data)
 {
@@ -196,6 +215,31 @@ void writeToFile(const std::string& filename, const vectT& data)
     outFile.close();
 }
 } // namespace io
+
+namespace os
+{
+std::vector<std::string> listDir(const std::string& path,
+     const std::string& mask = "*.*")
+{
+    std::vector<std::string> filenames;
+    std::string search_path = path + "/" + mask;
+    WIN32_FIND_DATAA fd;
+    HANDLE hFind = ::FindFirstFileA(search_path.c_str(), &fd);
+    if (hFind != INVALID_HANDLE_VALUE)
+    {
+        do {
+            // read all (real) files in current folder
+            // , delete '!' read other 2 default folder . and ..
+            if (!(fd.dwFileAttributes & FILE_ATTRIBUTE_DIRECTORY))
+            {
+                filenames.push_back(fd.cFileName);
+            }
+        } while (::FindNextFileA(hFind, &fd));
+        ::FindClose(hFind);
+    }
+    return filenames;
+}
+} // namespace os
 
 /// algorithms
 namespace alg
