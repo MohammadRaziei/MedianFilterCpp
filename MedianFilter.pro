@@ -7,4 +7,5 @@ SOURCES += \
         main.cpp
 
 HEADERS += \
-    io.h
+    io.h \
+    medianFilter.h
